@@ -1,0 +1,51 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# Load Boston Housing dataset from keras datasets
+from tensorflow.keras.datasets import boston_housing
+# Load the data
+(X_train, y_train), (X_test, y_test) = boston_housing.load_data()
+print(f"Training Data Shape: {X_train.shape}")
+print(f"Testing Data Shape: {X_test.shape}")
+
+# Standardizing features (important for Neural Networks)
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Building the model
+model = keras.Sequential([
+    layers.Dense(64, activation='relu', input_shape=(X_train_scaled.shape[1],)),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(1)  # Single neuron output (because it's regression)
+])
+# Compile the model
+model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+
+# Train the model
+history = model.fit(X_train_scaled, y_train, epochs=100, batch_size=32, validation_split=0.2, verbose=1)
+
+# Evaluate on Test Set
+test_loss, test_mae = model.evaluate(X_test_scaled, y_test, verbose=2)
+print(f"Test Loss (MSE): {test_loss:.2f}")
+print(f"Test MAE: {test_mae:.2f}")
+
+import matplotlib.pyplot as plt
+# Plot training & validation loss values
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('Model Loss (MSE)')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['Train', 'Validation'], loc='upper right')
+plt.show()
+
+# Make predictions
+predictions = model.predict(X_test_scaled)
+# Display first 5 predictions vs actual prices
+for i in range(5):
+    print(f"Predicted Price: {predictions[i][0]:.2f}, Actual Price: {y_test[i]}")

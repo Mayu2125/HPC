@@ -1,0 +1,68 @@
+import yfinance as yf
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow.keras import layers
+from sklearn.preprocessing import MinMaxScaler
+
+# Fetch Google (GOOGL) stock data from Yahoo Finance (2012-2016)
+data = yf.download('GOOGL', start='2012-01-01', end='2016-12-31')
+# Display the first few rows of data
+data.head()
+
+# Use only the 'Open' price for prediction
+open_prices = data[['Open']].values
+# Scale data between 0 and 1
+scaler = MinMaxScaler(feature_range=(0, 1))
+open_prices_scaled = scaler.fit_transform(open_prices)
+# Prepare sequences (previous 60 days' data to predict the next day)
+X_train = []
+y_train = []
+for i in range(60, len(open_prices_scaled)):
+    X_train.append(open_prices_scaled[i-60:i, 0])  # Previous 60 days
+    y_train.append(open_prices_scaled[i, 0])       # Predict next day
+X_train, y_train = np.array(X_train), np.array(y_train)
+# Reshape for RNN input (samples, timesteps, features)
+X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
+
+# Build the RNN model
+model = tf.keras.Sequential([
+    layers.SimpleRNN(50, return_sequences=True, input_shape=(X_train.shape[1], 1)),
+    layers.SimpleRNN(50),
+    layers.Dense(1)
+])
+# Compile the model
+model.compile(optimizer='adam', loss='mean_squared_error')
+
+# Train the model
+history = model.fit(X_train, y_train, epochs=20, batch_size=32, verbose=1)
+
+# Fetch test data (last 2 years of stock data)
+test_data = yf.download('GOOGL', start='2017-01-01', end='2017-12-31')
+real_stock_price = test_data[['Open']].values
+# Combine train and test data
+total_data = pd.concat((data['Open'], test_data['Open']), axis=0)
+# Prepare input for prediction
+inputs = total_data[len(total_data) - len(test_data) - 60:].values
+inputs = inputs.reshape(-1, 1)
+inputs = scaler.transform(inputs)
+X_test = []
+for i in range(60, len(inputs)):
+    X_test.append(inputs[i-60:i, 0])
+X_test = np.array(X_test)
+X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
+# Predict stock prices
+predicted_stock_price = model.predict(X_test)
+# Reverse scaling to get actual stock price predictions
+predicted_stock_price = scaler.inverse_transform(predicted_stock_price)
+
+# Plot the real and predicted stock prices
+plt.figure(figsize=(10,6))
+plt.plot(real_stock_price, color='red', label='Real Google Stock Price')
+plt.plot(predicted_stock_price, color='blue', label='Predicted Google Stock Price')
+plt.title('Google Stock Price Prediction (RNN)')
+plt.xlabel('Time')
+plt.ylabel('Stock Price')
+plt.legend()
+plt.show()
